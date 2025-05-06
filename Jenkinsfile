@@ -1,39 +1,34 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'hashicorp/terraform:latest' 
+            args '--entrypoint=""'
+        }
+    }
 
     environment {
-        TF_IN_AUTOMATION = "true"
+        TF_IN_AUTOMATION = 'true'
     }
 
     stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
-
-        stage('Terraform Init') {
-            steps {
-                sh 'terraform init'
-            }
-        }
-
-        stage('Terraform Plan') {
-            steps {
-                sh 'terraform plan -out=tfplan'
-            }
-        }
-
         stage('Terraform Apply') {
             steps {
-                sh 'terraform apply -auto-approve tfplan'
-            }
-        }
-    }
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-creds-id'
+                ]]) {
+                    sh '''
+                        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
 
-    post {
-        failure {
-            echo 'Terraform apply failed!'
+                        git clone https://github.com/NaghamMohamedMohamed/Jenkins-Terraform-Deployment.git
+                        cd Jenkins-Terraform-Deployment
+
+                        terraform init
+                        terraform apply --auto-approve 
+                    '''
+                }
+            }
         }
     }
 }
